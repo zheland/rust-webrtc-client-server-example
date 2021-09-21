@@ -18,7 +18,8 @@ WebRTC communication itself does not work yet.
 - [ ] Server-To-Receiver-Client text,
 - [ ] Server-To-Receiver-Client video,
 - [ ] Each Sender-Client paired with the Receiver-Client,
-- [ ] Вata transfer from Sender-Client to Receiver-Client via server.
+- [ ] Data transfer from Sender-Client to Receiver-Client via server.
+- [ ] Video transfer from Sender-Client to Receiver-Client via server.
 
 ## Setup
 
@@ -27,6 +28,9 @@ WebRTC communication itself does not work yet.
 ## Usage
 
 * Run `bash watch.sh`
+* Open `localhost:8080` in browser
+* Edit the server address if necessary and click button `[Start sender]`.
+* Type in TextArea, the message will be displayed in the server console.
 
 ## License
 
