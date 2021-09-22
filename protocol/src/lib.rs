@@ -44,14 +44,14 @@ pub enum ClientReceiverMessage {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub enum ServerSenderMessage {
+pub enum ServerReceiverMessage {
     Answer(SessionDescription),
     IceCandidate(IceCandidate),
     AllIceCandidatesSent,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub enum ServerReceiverMessage {
+pub enum ServerSenderMessage {
     Offer(SessionDescription),
     IceCandidate(IceCandidate),
     AllIceCandidatesSent,

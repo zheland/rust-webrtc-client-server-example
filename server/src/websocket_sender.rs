@@ -27,8 +27,4 @@ impl<T: Serialize> WebSocketSender<T> {
         let message: Vec<u8> = serialize(&message).unwrap();
         self.sender.send(Message::Binary(message)).await.unwrap();
     }
-
-    pub fn _into_stream(self) -> SplitSink<WebSocketStream<TcpStream>, Message> {
-        self.sender
-    }
 }

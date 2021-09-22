@@ -16,7 +16,7 @@ pub struct Sender {
     data_channel: RtcDataChannel,
     media_stream: MediaStream,
     video: HtmlVideoElement,
-    text: HtmlTextAreaElement,
+    text_area: HtmlTextAreaElement,
     message_handler: ClosureCell1<MessageEvent>,
     icecandidate_handler: ClosureCell1<RtcPeerConnectionIceEvent>,
     negotiationneeded_handler: ClosureCell1<Event>,
@@ -38,7 +38,8 @@ impl Sender {
 
         let mut constraints = MediaStreamConstraints::new();
         let _: &mut _ = constraints.video(&JsValue::TRUE);
-        let _: &mut _ = constraints.audio(&JsValue::TRUE);
+        // Audio transmission has not yet been implemented by the server
+        // let _: &mut _ = constraints.audio(&JsValue::TRUE);
 
         let navigator = navigator();
         let media_devices = navigator.media_devices().unwrap();
@@ -68,7 +69,7 @@ impl Sender {
             let track: MediaStreamTrack = track.dyn_into().unwrap();
             let _: RtcRtpSender = webrtc.add_track_0(&track, &media_stream);
         }
-        let data_channel = webrtc.create_data_channel("default");
+        let data_channel = webrtc.create_data_channel("data");
 
         let websocket = WebSocket::new(addr.as_ref()).unwrap();
         websocket.set_binary_type(BinaryType::Arraybuffer);
@@ -85,7 +86,7 @@ impl Sender {
             media_stream,
             data_channel,
             video,
-            text,
+            text_area: text,
             message_handler: RefCell::new(None),
             icecandidate_handler: RefCell::new(None),
             negotiationneeded_handler: RefCell::new(None),
@@ -104,7 +105,7 @@ impl Sender {
         use crate::init_weak_callback;
         use web_sys::HtmlElement;
 
-        self.start_receiver().await;
+        self.start_server_receiver().await;
 
         init_weak_callback(
             &self,
@@ -159,17 +160,39 @@ impl Sender {
             Self::on_input,
             &self.input_handler,
             HtmlElement::set_oninput,
-            &self.text,
+            &self.text_area,
         );
 
         self.send_offer().await;
     }
 
-    async fn start_receiver(self: &Arc<Self>) {
+    async fn start_server_receiver(self: &Arc<Self>) {
         use crate::SendWebSocketMessage;
         use protocol::ClientMessage;
 
         self.websocket.send(ClientMessage::StartReceiver);
+    }
+
+    fn on_message(self: &Arc<Self>, ev: MessageEvent) {
+        use crate::ParseWebSocketMessage;
+        use protocol::ServerReceiverMessage;
+        use wasm_bindgen_futures::spawn_local;
+
+        let message = ev.parse();
+        match message {
+            ServerReceiverMessage::Answer(sdp) => {
+                let self_arc = Arc::clone(self);
+                spawn_local(async move { self_arc.on_answer(sdp).await });
+            }
+            ServerReceiverMessage::IceCandidate(candidate) => {
+                let self_arc = Arc::clone(self);
+                spawn_local(async move { self_arc.on_remote_icecandidate(candidate).await });
+            }
+            ServerReceiverMessage::AllIceCandidatesSent => {
+                let self_arc = Arc::clone(self);
+                spawn_local(async move { self_arc.on_remote_all_icecandidates_sent().await });
+            }
+        }
     }
 
     async fn send_offer(self: &Arc<Self>) {
@@ -181,7 +204,6 @@ impl Sender {
         use web_sys::RtcSessionDescriptionInit;
 
         let offer = JsFuture::from(self.webrtc.create_offer()).await.unwrap();
-
         let offer: &RtcSessionDescriptionInit = offer.as_ref().unchecked_ref();
 
         let _: JsValue = JsFuture::from(self.webrtc.set_local_description(offer))
@@ -196,28 +218,6 @@ impl Sender {
         log::debug!("local offer: {:?}", sdp);
         self.websocket
             .send(ClientSenderMessage::Offer(SessionDescription(sdp)));
-    }
-
-    fn on_message(self: &Arc<Self>, ev: MessageEvent) {
-        use crate::ParseWebSocketMessage;
-        use protocol::ServerSenderMessage;
-        use wasm_bindgen_futures::spawn_local;
-
-        let message = ev.parse();
-        match message {
-            ServerSenderMessage::Answer(sdp) => {
-                let self_arc = Arc::clone(self);
-                spawn_local(async move { self_arc.on_answer(sdp).await });
-            }
-            ServerSenderMessage::IceCandidate(candidate) => {
-                let self_arc = Arc::clone(self);
-                spawn_local(async move { self_arc.on_remote_icecandidate(candidate).await });
-            }
-            ServerSenderMessage::AllIceCandidatesSent => {
-                let self_arc = Arc::clone(self);
-                spawn_local(async move { self_arc.on_remote_all_icecandidates_sent().await });
-            }
-        }
     }
 
     async fn on_answer(self: &Arc<Self>, answer: SessionDescription) {
@@ -237,24 +237,7 @@ impl Sender {
     }
 
     async fn on_remote_icecandidate(self: &Arc<Self>, ice_candidate: IceCandidate) {
-        use wasm_bindgen::JsValue;
-        use wasm_bindgen_futures::JsFuture;
-        use web_sys::{RtcIceCandidate, RtcIceCandidateInit};
-
-        log::debug!("remote ice candidate: {:?}", ice_candidate);
-
-        let mut candidate = RtcIceCandidateInit::new(&ice_candidate.candidate);
-        let _: &mut _ = candidate
-            .sdp_mid(ice_candidate.sdp_mid.as_deref())
-            .sdp_m_line_index(ice_candidate.sdp_mline_index);
-        let candidate = RtcIceCandidate::new(&candidate).unwrap();
-
-        let _: JsValue = JsFuture::from(
-            self.webrtc
-                .add_ice_candidate_with_opt_rtc_ice_candidate(Some(&candidate)),
-        )
-        .await
-        .unwrap();
+        crate::on_remote_icecandidate(&self.webrtc, ice_candidate).await;
     }
 
     async fn on_remote_all_icecandidates_sent(self: &Arc<Self>) {
@@ -262,30 +245,9 @@ impl Sender {
     }
 
     fn on_icecandidate(self: &Arc<Self>, ev: RtcPeerConnectionIceEvent) {
-        use crate::SendWebSocketMessage;
         use protocol::ClientSenderMessage;
 
-        if let Some(candidate) = ev.candidate() {
-            let candidate_str = candidate.candidate();
-            match candidate_str.as_ref() {
-                "" => {
-                    log::debug!("local all ice candidates sent");
-                    self.websocket
-                        .send(ClientSenderMessage::AllIceCandidatesSent)
-                }
-                _ => {
-                    let ice_candidate = IceCandidate {
-                        candidate: candidate_str,
-                        sdp_mid: candidate.sdp_mid(),
-                        sdp_mline_index: candidate.sdp_m_line_index(),
-                        username_fragment: None,
-                    };
-                    log::debug!("local ice candidate: {:?}", ice_candidate);
-                    self.websocket
-                        .send(ClientSenderMessage::IceCandidate(ice_candidate));
-                }
-            };
-        }
+        crate::on_icecandidate(&self.websocket, ev, ClientSenderMessage::IceCandidate);
     }
 
     fn on_negotiationneeded(self: &Arc<Self>, _: Event) {
@@ -317,11 +279,15 @@ impl Sender {
         use wasm_bindgen::JsCast;
 
         let target: HtmlTextAreaElement = ev.target().unwrap().dyn_into().unwrap();
-        // The null first byte is used because the operation fails if an empty string is sent
-        let data = format!("\0{}", target.value());
-        self.data_channel
-            .send_with_u8_array(data.as_bytes())
-            .unwrap();
+        let string = target.value();
+        if string.is_empty() {
+            // The operation fails if an empty string is sent
+            self.data_channel.send_with_u8_array(b"\0").unwrap();
+        } else {
+            self.data_channel
+                .send_with_u8_array(string.as_bytes())
+                .unwrap();
+        }
     }
 }
 
@@ -348,6 +314,6 @@ impl Drop for Sender {
         }
 
         self.video.remove();
-        self.text.remove();
+        self.text_area.remove();
     }
 }

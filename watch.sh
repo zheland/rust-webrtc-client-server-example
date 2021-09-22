@@ -15,7 +15,7 @@ CLIENT_PID=$!
 
 (
     cd server
-    cargo watch -s "RUST_LOG=debug cargo run -- -a $SERVER_ADDRESS -p $SERVER_PORT"
+    cargo watch -s "RUST_LOG=warn,server=debug cargo run -- -a $SERVER_ADDRESS -p $SERVER_PORT"
 ) &
 SERVER_PID=$!
 

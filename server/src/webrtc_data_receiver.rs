@@ -4,13 +4,22 @@ use std::sync::Arc;
 use webrtc::data::data_channel::data_channel_message::DataChannelMessage;
 use webrtc::data::data_channel::RTCDataChannel;
 
+use crate::ChannelSender;
+
 pub struct WebRtcDataReceiver {
+    channel_sender: ChannelSender,
     data_channel: Arc<RTCDataChannel>,
 }
 
 impl WebRtcDataReceiver {
-    pub async fn new(data_channel: Arc<RTCDataChannel>) -> Arc<Self> {
-        let receiver = Arc::new(Self { data_channel });
+    pub async fn new(
+        channel_sender: ChannelSender,
+        data_channel: Arc<RTCDataChannel>,
+    ) -> Arc<Self> {
+        let receiver = Arc::new(Self {
+            channel_sender,
+            data_channel,
+        });
 
         receiver.init().await;
 
@@ -26,14 +35,18 @@ impl WebRtcDataReceiver {
     }
 
     pub async fn on_message(self: Arc<Self>, msg: DataChannelMessage) {
-        let data = &msg.data[1..];
-        let string = String::from_utf8_lossy(data);
+        use crate::ChannelMessage;
+
+        let string = String::from_utf8_lossy(&msg.data);
 
         log::debug!(
             "Message from DataChannel '{}': '{}'\n",
             self.data_channel.label(),
             string
         );
+
+        self.channel_sender
+            .send(ChannelMessage::Data(msg.data.to_vec()));
     }
 }
 

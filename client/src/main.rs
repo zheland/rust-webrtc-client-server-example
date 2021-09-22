@@ -21,8 +21,8 @@ mod params;
 mod receiver;
 mod sender;
 mod weak_callback;
-mod webrtc_configuration;
-mod websocket;
+mod webrtc_utils;
+mod websocket_utils;
 
 use app::App;
 use html::{body, navigator, ElementExt};
@@ -31,8 +31,8 @@ use params::default_server_address;
 use receiver::Receiver;
 use sender::Sender;
 use weak_callback::{init_weak_callback, ClosureCell1};
-use webrtc_configuration::RtcConfigurationExt;
-use websocket::{ParseWebSocketMessage, SendWebSocketMessage};
+use webrtc_utils::{on_icecandidate, on_remote_icecandidate, RtcConfigurationExt};
+use websocket_utils::{ParseWebSocketMessage, SendWebSocketMessage};
 
 fn main() {
     console_error_panic_hook::set_once();
