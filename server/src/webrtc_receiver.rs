@@ -171,7 +171,6 @@ impl WebRtcReceiver {
         receiver: Option<Arc<RTCRtpReceiver>>,
     ) {
         if let Some(track) = track {
-            log::debug!("track received: {:?}", track.codec().await);
             let media_receiver =
                 WebRtcMediaReceiver::new(self.channel_sender.clone(), track, receiver).await;
             self.media_receivers.write().await.push(media_receiver);

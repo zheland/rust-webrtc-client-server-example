@@ -292,7 +292,6 @@ impl Receiver {
         use wasm_bindgen::JsCast;
 
         log::debug!("track received");
-        web_sys::console::log_1(&wasm_bindgen::JsValue::from(&ev));
 
         let video: HtmlVideoElement = body().add_child("video");
         video.set_autoplay(true);

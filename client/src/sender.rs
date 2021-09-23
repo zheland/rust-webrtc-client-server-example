@@ -38,8 +38,7 @@ impl Sender {
 
         let mut constraints = MediaStreamConstraints::new();
         let _: &mut _ = constraints.video(&JsValue::TRUE);
-        // Audio transmission has not yet been implemented by the server
-        // let _: &mut _ = constraints.audio(&JsValue::TRUE);
+        let _: &mut _ = constraints.audio(&JsValue::TRUE);
 
         let navigator = navigator();
         let media_devices = navigator.media_devices().unwrap();
@@ -65,9 +64,15 @@ impl Sender {
         let conf = RtcConfiguration::new().with_google_stun_server();
         let webrtc = RtcPeerConnection::new_with_configuration(&conf).unwrap();
 
-        for track in media_stream.get_tracks().iter() {
-            let track: MediaStreamTrack = track.dyn_into().unwrap();
-            let _: RtcRtpSender = webrtc.add_track_0(&track, &media_stream);
+        let audio_tracks = media_stream.get_audio_tracks();
+        let video_tracks = media_stream.get_video_tracks();
+        let audio_stream = MediaStream::new_with_tracks(&audio_tracks).unwrap();
+        let video_stream = MediaStream::new_with_tracks(&video_tracks).unwrap();
+        for stream in &[audio_stream, video_stream] {
+            for track in stream.get_tracks().iter() {
+                let track: MediaStreamTrack = track.dyn_into().unwrap();
+                let _: RtcRtpSender = webrtc.add_track_0(&track, &stream);
+            }
         }
         let data_channel = webrtc.create_data_channel("data");
 

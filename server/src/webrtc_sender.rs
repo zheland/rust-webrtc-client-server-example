@@ -18,7 +18,8 @@ pub struct WebRtcSender {
     websocket_sender: Mutex<WebSocketSender<ServerSenderMessage>>,
     delayed_icecandidates: Mutex<Vec<IceCandidate>>,
     data_channel: Arc<RTCDataChannel>,
-    media_track: Arc<TrackLocalStaticRTP>,
+    video_track: Arc<TrackLocalStaticRTP>,
+    audio_track: Arc<TrackLocalStaticRTP>,
 }
 
 impl WebRtcSender {
@@ -27,7 +28,7 @@ impl WebRtcSender {
         channel_receiver: ChannelReceiver,
         websocket_sender: WebSocketSender<ServerSenderMessage>,
     ) -> Arc<Self> {
-        use webrtc::api::media_engine::MIME_TYPE_VP8;
+        use webrtc::api::media_engine::{MIME_TYPE_OPUS, MIME_TYPE_VP8};
         use webrtc::media::rtp::rtp_codec::RTCRtpCodecCapability;
         use webrtc::media::track::track_local::TrackLocal;
 
@@ -40,18 +41,30 @@ impl WebRtcSender {
             .create_data_channel("data", None)
             .await
             .unwrap();
-        let media_track = Arc::new(TrackLocalStaticRTP::new(
+        let video_track = Arc::new(TrackLocalStaticRTP::new(
             RTCRtpCodecCapability {
                 mime_type: MIME_TYPE_VP8.to_owned(),
                 ..Default::default()
             },
             "video".to_owned(),
-            "webrtc-rs".to_owned(),
+            "video".to_owned(),
+        ));
+        let audio_track = Arc::new(TrackLocalStaticRTP::new(
+            RTCRtpCodecCapability {
+                mime_type: MIME_TYPE_OPUS.to_owned(),
+                ..Default::default()
+            },
+            "audio".to_owned(),
+            "audio".to_owned(),
         ));
 
         #[allow(trivial_casts)] // false positive
-        let media_track_ref = Arc::clone(&media_track) as Arc<dyn TrackLocal + Sync + Send>;
-        let _ = peer_connection.add_track(media_track_ref).await.unwrap();
+        let video_track_ref = Arc::clone(&video_track) as Arc<dyn TrackLocal + Sync + Send>;
+        let _ = peer_connection.add_track(video_track_ref).await.unwrap();
+
+        #[allow(trivial_casts)] // false positive
+        let audio_track_ref = Arc::clone(&audio_track) as Arc<dyn TrackLocal + Sync + Send>;
+        let _ = peer_connection.add_track(audio_track_ref).await.unwrap();
 
         let receiver = Arc::new(Self {
             api,
@@ -60,7 +73,8 @@ impl WebRtcSender {
             peer_connection,
             delayed_icecandidates,
             data_channel,
-            media_track,
+            video_track,
+            audio_track,
         });
 
         receiver.init().await;
@@ -192,10 +206,15 @@ impl WebRtcSender {
                             .unwrap();
                     }
                 }
-                ChannelMessage::Media(data) => {
+                ChannelMessage::Video(data) => {
                     let mut buf = data.as_slice();
                     let rtp = Packet::unmarshal(&mut buf).unwrap();
-                    let _: usize = self.media_track.write_rtp(&rtp).await.unwrap();
+                    let _: usize = self.video_track.write_rtp(&rtp).await.unwrap();
+                }
+                ChannelMessage::Audio(data) => {
+                    let mut buf = data.as_slice();
+                    let rtp = Packet::unmarshal(&mut buf).unwrap();
+                    let _: usize = self.audio_track.write_rtp(&rtp).await.unwrap();
                 }
             }
         }

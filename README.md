@@ -22,11 +22,13 @@ In order to simplify the code, all the errors are unwrapped.
 - [x] Sender-Client-To-Server WebRTC-connection,
 - [x] Sender-Client-To-Server text,
 - [x] Sender-Client-To-Server video,
-- [ ] Sender-Client-To-Server audio,
+- [x] Sender-Client-To-Server audio,
+- [ ] Sender-Client-To-Server video and audio as a single stream,
 - [x] Server-To-Receiver-Client WebRTC-connection,
 - [x] Server-To-Receiver-Client text,
 - [x] Server-To-Receiver-Client video,
-- [ ] Server-To-Receiver-Client audio,
+- [x] Server-To-Receiver-Client audio,
+- [ ] Server-To-Receiver-Client video and audio as a single stream,
 - [x] Each Sender-Client paired with the Receiver-Client,
 - [x] Data transfer from Sender-Client to Receiver-Client via server,
 - [x] Media transfer from Sender-Client to Receiver-Client via server.
@@ -43,6 +45,7 @@ In order to simplify the code, all the errors are unwrapped.
 * Type in sender TextArea, the message will be displayed on the receiver TextArea.
 * If the receiver is started before the sender, you will see the video as soon as the sender is started.
 * If the sender starts before the receiver, the video will start after the sender sends keyframes.
+* A separate `HtmlVideoElement` is used for audio playback on the Client-Receiver side.
 
 ## License
 

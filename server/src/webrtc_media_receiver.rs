@@ -41,6 +41,7 @@ impl WebRtcMediaReceiver {
 
     async fn thread(self: &Arc<Self>) {
         use crate::ChannelMessage;
+        use webrtc::media::rtp::rtp_codec::RTPCodecType;
         use webrtc_util::marshal::Marshal;
         use webrtc_util::marshal::MarshalSize;
 
@@ -48,8 +49,17 @@ impl WebRtcMediaReceiver {
             let len = rtp.marshal_size();
             let mut buf = vec![0; len];
             assert_eq!(rtp.marshal_to(&mut buf).unwrap(), len);
-            self.channel_sender
-                .send(ChannelMessage::Media(buf.to_vec()))
+            match self.track.kind() {
+                RTPCodecType::Video => self
+                    .channel_sender
+                    .send(ChannelMessage::Video(buf.to_vec())),
+                RTPCodecType::Audio => self
+                    .channel_sender
+                    .send(ChannelMessage::Audio(buf.to_vec())),
+                RTPCodecType::Unspecified => {
+                    panic!("Track data with unspecified codec type received")
+                }
+            }
         }
     }
 }
