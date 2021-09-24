@@ -171,15 +171,15 @@ impl Receiver {
         }
     }
 
-    async fn on_offer(self: &Arc<Self>, answer: SessionDescription) {
+    async fn on_offer(self: &Arc<Self>, offer: SessionDescription) {
         use wasm_bindgen::JsValue;
         use wasm_bindgen_futures::JsFuture;
         use web_sys::{RtcSdpType, RtcSessionDescriptionInit};
 
-        log::debug!("remote offer: {:?}", answer);
+        log::debug!("remote offer: {:?}", offer);
 
         let mut remote_description = RtcSessionDescriptionInit::new(RtcSdpType::Offer);
-        let _: &mut _ = remote_description.sdp(&answer.0);
+        let _: &mut _ = remote_description.sdp(&offer.0);
 
         let webrtc = self.webrtc.clone();
         let _: JsValue = JsFuture::from(webrtc.set_remote_description(&remote_description))
