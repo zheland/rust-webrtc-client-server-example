@@ -1,5 +1,13 @@
 # Rust WebRTC Client-Server example
 
+> [!WARNING]
+> **Archived: 2026-09-29**
+>
+> This repository is no longer maintained.
+>
+> Dependencies are frozen as of the last commit and may be outdated or contain
+> known vulnerabilities.
+
 ## About
 
 An example with WebRTC-client and WebRTC-server.
